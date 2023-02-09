@@ -1,0 +1,9 @@
+{
+    "files.exclude": {
+        "**/.vscode": true,
+        "**/.data": true,
+        "**/.model": true,
+        "**/.__pycache__": true
+    }
+    
+}
