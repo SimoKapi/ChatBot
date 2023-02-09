@@ -29,22 +29,14 @@ def main():
     """
     questions, answers = getData()
 
-    """for i in questions:
-        i = '{:<30}'.format(i[:30])
-
-    for j in answers:
-        j = '{:<30}'.format(j[:30])"""
-
     """
     Convert questions and answers from dataset to readable bytes
     """
     byteQuestions = encodeList(questions)
     byteAnswers = encodeList(answers)
 
-    byteQuestions = np.resize(byteQuestions, (LINE_LENGTH,))
-    byteAnswers = np.resize(byteAnswers, (LINE_LENGTH,))
-
-    byteAnswers = tf.keras.utils.to_categorical([tf.keras.utils.to_categorical(np.array(i)) for i in byteAnswers])
+    #byteAnswers = tf.keras.utils.to_categorical(byteAnswers)
+    #byteAnswers = tf.keras.utils.to_categorical([tf.keras.utils.to_categorical(np.array(i)) for i in byteAnswers])
 
     x_train, x_test, y_train, y_test = train_test_split(
         np.array(byteQuestions), np.array(byteAnswers), test_size=TEST_SiZE
@@ -106,7 +98,7 @@ def getData():
 def getModel():
     model = tf.keras.Sequential(
         [
-            tf.keras.layers.Embedding(input_dim=LINE_LENGTH, output_dim=64),
+            tf.keras.layers.Embedding(input_dim=(LINE_LENGTH, 1, 1), output_dim=64),
             tf.keras.layers.Dense(10)
         ]
     )
@@ -125,7 +117,15 @@ def encodeList(inputList):
         iList = []
         for j in bytes(i, "ascii"):
             iList.append(j)
-        outputList.append(iList)
+
+        """
+        Resize iList array to a standardized length of LINE_LENGTH
+        """
+        npArrayiList = np.array(iList)
+        npArrayiList.resize((LINE_LENGTH,))
+
+        outputList.append(npArrayiList)
+
     return outputList
 
 def inp_to_bool(inp):
