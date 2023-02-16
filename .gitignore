@@ -1,7 +1,9 @@
 #Own ignores
 model
 data
-word2vec.model
+Word2Vec-Models
+testmodel.model
+waterbedModel
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

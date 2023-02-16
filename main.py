@@ -1,4 +1,3 @@
-#https://github.com/pytorch/tutorials/blob/master/beginner_source/chatbot_tutorial.py
 import tensorflow as tf
 import json
 import os
@@ -19,15 +18,17 @@ from gensim.models import Word2Vec
 To download the movie corpus
 """
 #from convokit import Corpus, download
+TRAIN_WORD_MODEL = True
 
-EPOCHS = 1
+EPOCHS = 10
 TEST_SiZE = 0.4
 
-VECTOR_SIZE = 3
-LINE_LENGTH = 10
+VECTOR_SIZE = 5
+LINE_LENGTH = 20
 
 corpusName = "movie-corpus"
 dataPath = "data"
+word2vecmodels = "Word2Vec-Models"
 
 ignoreCharacters = ".,!?"
 
@@ -53,14 +54,17 @@ def main():
         """
         Convert questions and answers from dataset to trainable bytes
         """
-        vectorQuestions, vectorAnswers = encodeList(False, questions, answers)
+        trainModel = TRAIN_WORD_MODEL
+        try:
+            Word2Vec.load(os.path.join(word2vecmodels, f"word2vec{VECTOR_SIZE}.model"))
+        except FileNotFoundError:
+            trainModel = True
+
+        vectorQuestions, vectorAnswers = encodeList(trainModel, questions, answers)
 
         x_train, x_test, y_train, y_test = train_test_split(
             np.array(vectorQuestions), np.array(vectorAnswers), test_size=TEST_SiZE
         )
-
-        for i in model.layers:
-            print(i.input_shape)
 
         model.fit(x_train, y_train, epochs=EPOCHS)
         model.evaluate(x_test,  y_test, verbose=2)
@@ -78,27 +82,36 @@ def main():
 Interact with the AI
 """
 def aiInteract(model):
-    usrInput = input("Question to AI: ")
-    print(f"Answer from AI: {getOutput(model, usrInput)}\n")
+    try:
+        usrInput = input("Question to AI: ")
+        print(f"Answer from AI: {getOutput(model, usrInput)}\n")
 
-    aiInteract(model)
+        aiInteract(model)
+    except KeyboardInterrupt:
+        exit
 
 """
 Get an actual output from trained neural network
 """
 def getOutput(model, input):
-    wordModel = Word2Vec.load("word2vec.model")
+    wordModel = Word2Vec.load(os.path.join(word2vecmodels, f"word2vec{VECTOR_SIZE}.model"))
     data = []
     for word in word_tokenize(input):
-        data.append(wordModel.wv[word.lower()])
+        try:
+            data.append(wordModel.wv[word.lower()])
+        except KeyError:
+            return "Could you please rephrase that question?"
 
-    output = model.predict(data)
+    data = encodeList(False, [input])[0]
+
+    output = model.predict(data)[0]
 
     outputWords = []
     for vector in output:
-        outputWords = wordModel.wv.most_similar(positive=[vector], topn=1)
+        outputWords.append(wordModel.wv.most_similar(positive=vector, topn=1)[0][0])
 
-    return(outputWords)
+    strOutput = ' '.join(outputWords).capitalize()
+    return strOutput
 
 def getData():
     #data = dataSetScraper.scrapeData('https://hellobio.com/blog/interviews-with-scientists-mohammed-alawami.html')
@@ -137,7 +150,8 @@ def getModel():
         tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(64, return_sequences=True)),
         tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(32)),
         tf.keras.layers.Dense(64, activation='relu'),
-        tf.keras.layers.Dense(LINE_LENGTH, activation='softmax')
+        tf.keras.layers.Dense(LINE_LENGTH*VECTOR_SIZE, activation="sigmoid"),
+        tf.keras.layers.Reshape((LINE_LENGTH, VECTOR_SIZE))
     ])
 
     model.compile(
@@ -147,6 +161,13 @@ def getModel():
     )
 
     return model
+
+def stripString(input):
+    output = ""
+    for i in input:
+        if i not in ignoreCharacters:
+            output += i
+    return output
 
 """
 Convert list of strings to list of vectors
@@ -163,13 +184,13 @@ def encodeList(trainModel, *inputLists):
             temp = []
             
             for word in word_tokenize(sentence):
-                temp.append(word.lower())
+                temp.append(stripString(word.lower()))
         
             data.append(temp)
         wordModel = gensim.models.Word2Vec(data, min_count=1, vector_size=VECTOR_SIZE, window=5)
-        wordModel.save("word2vec.model")
+        wordModel.save(os.path.join(word2vecmodels, f"word2vec{VECTOR_SIZE}.model"))
     else:
-        wordModel = Word2Vec.load("word2vec.model")
+        wordModel = Word2Vec.load(os.path.join(word2vecmodels, f"word2vec{VECTOR_SIZE}.model"))
 
     """
     Get vector values for words
@@ -182,9 +203,9 @@ def encodeList(trainModel, *inputLists):
             tokenizedSent = word_tokenize(sentence)
             for i in range(LINE_LENGTH):
                 try:
-                    temp.append(wordModel.wv[tokenizedSent[i].lower()].tolist())
+                    temp.append(wordModel.wv[stripString(tokenizedSent[i].lower())].tolist())
                 except IndexError:
-                    temp.append([0.0, 0.0, 0.0])
+                    temp.append([0.0] * VECTOR_SIZE)
             catList.append(temp)
 
         outputList.append(catList)
