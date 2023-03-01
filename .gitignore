@@ -3,6 +3,7 @@ model
 data
 Word2Vec-Models
 testmodel.model
+wordindex.csv
 waterbedModel
 
 # Byte-compiled / optimized / DLL files
